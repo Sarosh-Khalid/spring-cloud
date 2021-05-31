@@ -1,5 +1,8 @@
 package io.javabrains.moviecatalogservice.resources;
 
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
+import com.netflix.ribbon.proxy.annotation.Hystrix;
 import io.javabrains.moviecatalogservice.models.CatalogItem;
 import io.javabrains.moviecatalogservice.models.Movie;
 import io.javabrains.moviecatalogservice.models.Rating;
@@ -27,6 +30,13 @@ public class CatalogResource {
     WebClient.Builder webClientBuilder;
 
     @RequestMapping("/{userId}")
+    @HystrixCommand(fallbackMethod = "getFallBackCatalog",
+    commandProperties = {
+            @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "5000"),
+            @HystrixProperty(name = "circuitBreaker.requestVolumeThreshold", value = "5"),
+            @HystrixProperty(name = "circuitBreaker.errorThresholdPercentage", value = "50"),
+            @HystrixProperty(name = "circuitBreaker.sleepWindowInMilliseconds", value = "5000")
+    })
     public List<CatalogItem> getCatalog(@PathVariable("userId") String userId) {
 
         UserRating userRating = restTemplate.getForObject("http://ratings-data-service/ratingsdata/user/" + userId, UserRating.class);
@@ -38,6 +48,10 @@ public class CatalogResource {
                 })
                 .collect(Collectors.toList());
 
+    }
+
+    public List<CatalogItem> getFallBackCatalog(@PathVariable("userId") String userId) {
+        return Arrays.asList(new CatalogItem("No movie", "", 0));
     }
 }
 
